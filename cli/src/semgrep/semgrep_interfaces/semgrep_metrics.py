@@ -1040,6 +1040,146 @@ class Mcp:
 
 
 @dataclass
+class InstallPro:
+    """Original type: install_pro = { ... }
+    """
+
+    success: Optional[bool] = None
+    error: Optional[str] = None
+
+    @classmethod
+    def from_json(cls, x: Any) -> 'InstallPro':
+        if isinstance(x, dict):
+            return cls(
+                success=_atd_read_bool(x['success']) if 'success' in x else None,
+                error=_atd_read_string(x['error']) if 'error' in x else None,
+            )
+        else:
+            _atd_bad_json('InstallPro', x)
+
+    def to_json(self) -> Any:
+        res: Dict[str, Any] = {}
+        if self.success is not None:
+            res['success'] = _atd_write_bool(self.success)
+        if self.error is not None:
+            res['error'] = _atd_write_string(self.error)
+        return res
+
+    @classmethod
+    def from_json_string(cls, x: str) -> 'InstallPro':
+        return cls.from_json(json.loads(x))
+
+    def to_json_string(self, **kw: Any) -> str:
+        return json.dumps(self.to_json(), **kw)
+
+
+@dataclass
+class Guardian:
+    """Original type: guardian = { ... }
+    """
+
+    hook: Optional[str] = None
+    session_id: Optional[str] = None
+    login_method: Optional[str] = None
+    scanner_version: Optional[str] = None
+    guardian_version: Optional[str] = None
+    deployment_names: Optional[List[str]] = None
+    deployment_ids: Optional[List[int]] = None
+    organization_ids: Optional[List[int]] = None
+    oauth_id: Optional[str] = None
+    oauth_email: Optional[str] = None
+    tool_name: Optional[str] = None
+    package_manager: Optional[str] = None
+    attached_lockfile: Optional[str] = None
+    num_scanned_files: Optional[int] = None
+    num_lines: Optional[int] = None
+    num_findings: Optional[int] = None
+    findings: Optional[List[Tuple[str, Finding]]] = None
+    blocking: Optional[bool] = None
+    exit_code: Optional[int] = None
+    errors: Optional[List[str]] = None
+
+    @classmethod
+    def from_json(cls, x: Any) -> 'Guardian':
+        if isinstance(x, dict):
+            return cls(
+                hook=_atd_read_string(x['hook']) if 'hook' in x else None,
+                session_id=_atd_read_string(x['session_id']) if 'session_id' in x else None,
+                login_method=_atd_read_string(x['login_method']) if 'login_method' in x else None,
+                scanner_version=_atd_read_string(x['scanner_version']) if 'scanner_version' in x else None,
+                guardian_version=_atd_read_string(x['guardian_version']) if 'guardian_version' in x else None,
+                deployment_names=_atd_read_list(_atd_read_string)(x['deployment_names']) if 'deployment_names' in x else None,
+                deployment_ids=_atd_read_list(_atd_read_int)(x['deployment_ids']) if 'deployment_ids' in x else None,
+                organization_ids=_atd_read_list(_atd_read_int)(x['organization_ids']) if 'organization_ids' in x else None,
+                oauth_id=_atd_read_string(x['oauth_id']) if 'oauth_id' in x else None,
+                oauth_email=_atd_read_string(x['oauth_email']) if 'oauth_email' in x else None,
+                tool_name=_atd_read_string(x['tool_name']) if 'tool_name' in x else None,
+                package_manager=_atd_read_string(x['package_manager']) if 'package_manager' in x else None,
+                attached_lockfile=_atd_read_string(x['attached_lockfile']) if 'attached_lockfile' in x else None,
+                num_scanned_files=_atd_read_int(x['num_scanned_files']) if 'num_scanned_files' in x else None,
+                num_lines=_atd_read_int(x['num_lines']) if 'num_lines' in x else None,
+                num_findings=_atd_read_int(x['num_findings']) if 'num_findings' in x else None,
+                findings=_atd_read_assoc_object_into_list(Finding.from_json)(x['findings']) if 'findings' in x else None,
+                blocking=_atd_read_bool(x['blocking']) if 'blocking' in x else None,
+                exit_code=_atd_read_int(x['exit_code']) if 'exit_code' in x else None,
+                errors=_atd_read_list(_atd_read_string)(x['errors']) if 'errors' in x else None,
+            )
+        else:
+            _atd_bad_json('Guardian', x)
+
+    def to_json(self) -> Any:
+        res: Dict[str, Any] = {}
+        if self.hook is not None:
+            res['hook'] = _atd_write_string(self.hook)
+        if self.session_id is not None:
+            res['session_id'] = _atd_write_string(self.session_id)
+        if self.login_method is not None:
+            res['login_method'] = _atd_write_string(self.login_method)
+        if self.scanner_version is not None:
+            res['scanner_version'] = _atd_write_string(self.scanner_version)
+        if self.guardian_version is not None:
+            res['guardian_version'] = _atd_write_string(self.guardian_version)
+        if self.deployment_names is not None:
+            res['deployment_names'] = _atd_write_list(_atd_write_string)(self.deployment_names)
+        if self.deployment_ids is not None:
+            res['deployment_ids'] = _atd_write_list(_atd_write_int)(self.deployment_ids)
+        if self.organization_ids is not None:
+            res['organization_ids'] = _atd_write_list(_atd_write_int)(self.organization_ids)
+        if self.oauth_id is not None:
+            res['oauth_id'] = _atd_write_string(self.oauth_id)
+        if self.oauth_email is not None:
+            res['oauth_email'] = _atd_write_string(self.oauth_email)
+        if self.tool_name is not None:
+            res['tool_name'] = _atd_write_string(self.tool_name)
+        if self.package_manager is not None:
+            res['package_manager'] = _atd_write_string(self.package_manager)
+        if self.attached_lockfile is not None:
+            res['attached_lockfile'] = _atd_write_string(self.attached_lockfile)
+        if self.num_scanned_files is not None:
+            res['num_scanned_files'] = _atd_write_int(self.num_scanned_files)
+        if self.num_lines is not None:
+            res['num_lines'] = _atd_write_int(self.num_lines)
+        if self.num_findings is not None:
+            res['num_findings'] = _atd_write_int(self.num_findings)
+        if self.findings is not None:
+            res['findings'] = _atd_write_assoc_list_to_object((lambda x: x.to_json()))(self.findings)
+        if self.blocking is not None:
+            res['blocking'] = _atd_write_bool(self.blocking)
+        if self.exit_code is not None:
+            res['exit_code'] = _atd_write_int(self.exit_code)
+        if self.errors is not None:
+            res['errors'] = _atd_write_list(_atd_write_string)(self.errors)
+        return res
+
+    @classmethod
+    def from_json_string(cls, x: str) -> 'Guardian':
+        return cls.from_json(json.loads(x))
+
+    def to_json_string(self, **kw: Any) -> str:
+        return json.dumps(self.to_json(), **kw)
+
+
+@dataclass
 class Extension:
     """Original type: extension = { ... }
     """
@@ -1165,6 +1305,7 @@ class Environment:
     integrationName: Optional[str] = None
     isAuthenticated: bool = field(default_factory=lambda: False)
     deployment_id: Optional[int] = None
+    installMethod: Optional[str] = None
 
     @classmethod
     def from_json(cls, x: Any) -> 'Environment':
@@ -1181,6 +1322,7 @@ class Environment:
                 integrationName=_atd_read_string(x['integrationName']) if 'integrationName' in x else None,
                 isAuthenticated=_atd_read_bool(x['isAuthenticated']) if 'isAuthenticated' in x else False,
                 deployment_id=_atd_read_int(x['deployment_id']) if 'deployment_id' in x else None,
+                installMethod=_atd_read_string(x['installMethod']) if 'installMethod' in x else None,
             )
         else:
             _atd_bad_json('Environment', x)
@@ -1201,6 +1343,8 @@ class Environment:
         res['isAuthenticated'] = _atd_write_bool(self.isAuthenticated)
         if self.deployment_id is not None:
             res['deployment_id'] = _atd_write_int(self.deployment_id)
+        if self.installMethod is not None:
+            res['installMethod'] = _atd_write_string(self.installMethod)
         return res
 
     @classmethod
@@ -1248,6 +1392,8 @@ class Payload:
     value: Value
     extension: Extension
     mcp: Mcp
+    guardian: Guardian
+    install_pro: InstallPro
     parse_rate: List[Tuple[str, ParseStat]] = field(default_factory=lambda: [])
 
     @classmethod
@@ -1264,6 +1410,8 @@ class Payload:
                 value=Value.from_json(x['value']) if 'value' in x else _atd_missing_json_field('Payload', 'value'),
                 extension=Extension.from_json(x['extension']) if 'extension' in x else _atd_missing_json_field('Payload', 'extension'),
                 mcp=Mcp.from_json(x['mcp']) if 'mcp' in x else _atd_missing_json_field('Payload', 'mcp'),
+                guardian=Guardian.from_json(x['guardian']) if 'guardian' in x else _atd_missing_json_field('Payload', 'guardian'),
+                install_pro=InstallPro.from_json(x['install_pro']) if 'install_pro' in x else _atd_missing_json_field('Payload', 'install_pro'),
                 parse_rate=_atd_read_assoc_object_into_list(ParseStat.from_json)(x['parse_rate']) if 'parse_rate' in x else [],
             )
         else:
@@ -1281,6 +1429,8 @@ class Payload:
         res['value'] = (lambda x: x.to_json())(self.value)
         res['extension'] = (lambda x: x.to_json())(self.extension)
         res['mcp'] = (lambda x: x.to_json())(self.mcp)
+        res['guardian'] = (lambda x: x.to_json())(self.guardian)
+        res['install_pro'] = (lambda x: x.to_json())(self.install_pro)
         res['parse_rate'] = _atd_write_assoc_list_to_object((lambda x: x.to_json()))(self.parse_rate)
         return res
 

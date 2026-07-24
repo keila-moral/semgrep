@@ -654,7 +654,12 @@
       "properties": {
         "dependency_pattern": { "$ref": "#/definitions/sca_pattern" },
         "found_dependency": { "$ref": "#/definitions/found_dependency" },
-        "lockfile": { "$ref": "#/definitions/fpath" }
+        "lockfile": { "$ref": "#/definitions/fpath" },
+        "dependency_paths": {
+          "description": "All known dependency paths by which the matched (transitive) dependency was introduced into the project. Each path is ordered from the direct dependency that introduced it (node 0) to the matched (transitive) dependency (last node). Computed locally from the resolved dependency graph at scan time; only populated when dependency-graph (path-to-transitivity) resolution ran for the ecosystem. Empty/absent for direct dependencies or ecosystems without graph resolution. The number of paths per match is capped. EXPERIMENTAL since 1.166.0",
+          "type": "array",
+          "items": { "$ref": "#/definitions/dependency_path" }
+        }
       }
     },
     "sca_pattern": {
@@ -714,6 +719,16 @@
       "properties": {
         "package": { "type": "string" },
         "version": { "type": "string" }
+      }
+    },
+    "dependency_path": {
+      "type": "object",
+      "required": [ "nodes" ],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/dependency_child" }
+        }
       }
     },
     "validation_state": {
@@ -1621,6 +1636,10 @@
         "fips_mode": {
           "description": "From 1.126.0. Customers in FIPS environments have specific hash function requirements that this flag will override. See SAF-2057 for details.",
           "type": "boolean"
+        },
+        "nosemgrep_disabled": {
+          "description": "From 1.166.0. Org-wide setting (deployment.nosemgrep_disabled) that disables 'nosemgrep' inline ignore comments for the scan.",
+          "type": "boolean"
         }
       }
     },
@@ -1813,6 +1832,11 @@
         "enable_mal_deps": {
           "description": "Override to enable malicious dependency rules for this scan, even if disabled at the deployment level.",
           "type": "boolean"
+        },
+        "partial_scan_rule_ids": {
+          "description": "If set, the backend should filter the generated scan config down to only these rule IDs. Used by Semgrep Managed Scanning to run fast supply-chain incident scans for a small set of rules. Absent means a normal full scan. Acts as a filter on the config that would otherwise be produced: rules not normally included for this scan will still not run.",
+          "type": "array",
+          "items": { "$ref": "#/definitions/rule_id" }
         }
       }
     },
@@ -2695,7 +2719,8 @@
       "required": [
         "exclude", "max_target_bytes", "respect_gitignore",
         "respect_semgrepignore_files", "always_select_explicit_targets",
-        "explicit_targets", "force_novcs_project", "exclude_minified_files"
+        "explicit_targets", "force_novcs_project", "exclude_minified_files",
+        "exclude_binary_files"
       ],
       "properties": {
         "exclude": { "type": "array", "items": { "type": "string" } },
@@ -2720,6 +2745,7 @@
         },
         "force_novcs_project": { "type": "boolean" },
         "exclude_minified_files": { "type": "boolean" },
+        "exclude_binary_files": { "type": "boolean" },
         "baseline_commit": { "type": "string" }
       }
     },

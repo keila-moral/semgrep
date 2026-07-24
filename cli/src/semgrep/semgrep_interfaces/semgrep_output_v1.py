@@ -504,6 +504,35 @@ class DependencyKind:
         return json.dumps(self.to_json(), **kw)
 
 
+@dataclass
+class DependencyPath:
+    """Original type: dependency_path = { ... }
+    """
+
+    nodes: List[DependencyChild]
+
+    @classmethod
+    def from_json(cls, x: Any) -> 'DependencyPath':
+        if isinstance(x, dict):
+            return cls(
+                nodes=_atd_read_list(DependencyChild.from_json)(x['nodes']) if 'nodes' in x else _atd_missing_json_field('DependencyPath', 'nodes'),
+            )
+        else:
+            _atd_bad_json('DependencyPath', x)
+
+    def to_json(self) -> Any:
+        res: Dict[str, Any] = {}
+        res['nodes'] = _atd_write_list((lambda x: x.to_json()))(self.nodes)
+        return res
+
+    @classmethod
+    def from_json_string(cls, x: str) -> 'DependencyPath':
+        return cls.from_json(json.loads(x))
+
+    def to_json_string(self, **kw: Any) -> str:
+        return json.dumps(self.to_json(), **kw)
+
+
 @dataclass(frozen=True)
 class Npm:
     """Original type: ecosystem = [ ... | Npm | ... ]
@@ -3015,11 +3044,22 @@ class ScaPattern:
 @dataclass
 class DependencyMatch:
     """Original type: dependency_match = { ... }
+
+    :param dependency_paths: All known dependency paths by which the matched
+    (transitive) dependency was introduced into the project. Each path is
+    ordered from the direct dependency that introduced it (node 0) to the
+    matched (transitive) dependency (last node). Computed locally from the
+    resolved dependency graph at scan time; only populated when
+    dependency-graph (path-to-transitivity) resolution ran for the ecosystem.
+    Empty/absent for direct dependencies or ecosystems without graph
+    resolution. The number of paths per match is capped. EXPERIMENTAL since
+    1.166.0
     """
 
     dependency_pattern: ScaPattern
     found_dependency: FoundDependency
     lockfile: Fpath
+    dependency_paths: Optional[List[DependencyPath]] = None
 
     @classmethod
     def from_json(cls, x: Any) -> 'DependencyMatch':
@@ -3028,6 +3068,7 @@ class DependencyMatch:
                 dependency_pattern=ScaPattern.from_json(x['dependency_pattern']) if 'dependency_pattern' in x else _atd_missing_json_field('DependencyMatch', 'dependency_pattern'),
                 found_dependency=FoundDependency.from_json(x['found_dependency']) if 'found_dependency' in x else _atd_missing_json_field('DependencyMatch', 'found_dependency'),
                 lockfile=Fpath.from_json(x['lockfile']) if 'lockfile' in x else _atd_missing_json_field('DependencyMatch', 'lockfile'),
+                dependency_paths=_atd_read_list(DependencyPath.from_json)(x['dependency_paths']) if 'dependency_paths' in x else None,
             )
         else:
             _atd_bad_json('DependencyMatch', x)
@@ -3037,6 +3078,8 @@ class DependencyMatch:
         res['dependency_pattern'] = (lambda x: x.to_json())(self.dependency_pattern)
         res['found_dependency'] = (lambda x: x.to_json())(self.found_dependency)
         res['lockfile'] = (lambda x: x.to_json())(self.lockfile)
+        if self.dependency_paths is not None:
+            res['dependency_paths'] = _atd_write_list((lambda x: x.to_json()))(self.dependency_paths)
         return res
 
     @classmethod
@@ -6804,6 +6847,7 @@ class TargetingConf:
     explicit_targets: List[str]
     force_novcs_project: bool
     exclude_minified_files: bool
+    exclude_binary_files: bool
     include_: Optional[List[str]] = None
     extra_gitignore_patterns_to_exclude_git_untracked_files: List[str] = field(default_factory=lambda: [])
     semgrepignore_filename: Optional[str] = None
@@ -6822,6 +6866,7 @@ class TargetingConf:
                 explicit_targets=_atd_read_list(_atd_read_string)(x['explicit_targets']) if 'explicit_targets' in x else _atd_missing_json_field('TargetingConf', 'explicit_targets'),
                 force_novcs_project=_atd_read_bool(x['force_novcs_project']) if 'force_novcs_project' in x else _atd_missing_json_field('TargetingConf', 'force_novcs_project'),
                 exclude_minified_files=_atd_read_bool(x['exclude_minified_files']) if 'exclude_minified_files' in x else _atd_missing_json_field('TargetingConf', 'exclude_minified_files'),
+                exclude_binary_files=_atd_read_bool(x['exclude_binary_files']) if 'exclude_binary_files' in x else _atd_missing_json_field('TargetingConf', 'exclude_binary_files'),
                 include_=_atd_read_list(_atd_read_string)(x['include_']) if 'include_' in x else None,
                 extra_gitignore_patterns_to_exclude_git_untracked_files=_atd_read_list(_atd_read_string)(x['extra_gitignore_patterns_to_exclude_git_untracked_files']) if 'extra_gitignore_patterns_to_exclude_git_untracked_files' in x else [],
                 semgrepignore_filename=_atd_read_string(x['semgrepignore_filename']) if 'semgrepignore_filename' in x else None,
@@ -6841,6 +6886,7 @@ class TargetingConf:
         res['explicit_targets'] = _atd_write_list(_atd_write_string)(self.explicit_targets)
         res['force_novcs_project'] = _atd_write_bool(self.force_novcs_project)
         res['exclude_minified_files'] = _atd_write_bool(self.exclude_minified_files)
+        res['exclude_binary_files'] = _atd_write_bool(self.exclude_binary_files)
         if self.include_ is not None:
             res['include_'] = _atd_write_list(_atd_write_string)(self.include_)
         res['extra_gitignore_patterns_to_exclude_git_untracked_files'] = _atd_write_list(_atd_write_string)(self.extra_gitignore_patterns_to_exclude_git_untracked_files)
@@ -9416,6 +9462,9 @@ class ScanConfiguration:
     :param fips_mode: From 1.126.0. Customers in FIPS environments have
     specific hash function requirements that this flag will override. See
     SAF-2057 for details.
+    :param nosemgrep_disabled: From 1.166.0. Org-wide setting
+    (deployment.nosemgrep_disabled) that disables 'nosemgrep' inline ignore
+    comments for the scan.
     """
 
     rules: RawJson
@@ -9423,6 +9472,7 @@ class ScanConfiguration:
     triage_ignored_match_based_ids: List[str] = field(default_factory=lambda: [])
     project_merge_base: Optional[Sha1] = None
     fips_mode: bool = field(default_factory=lambda: False)
+    nosemgrep_disabled: bool = field(default_factory=lambda: False)
 
     @classmethod
     def from_json(cls, x: Any) -> 'ScanConfiguration':
@@ -9433,6 +9483,7 @@ class ScanConfiguration:
                 triage_ignored_match_based_ids=_atd_read_list(_atd_read_string)(x['triage_ignored_match_based_ids']) if 'triage_ignored_match_based_ids' in x else [],
                 project_merge_base=Sha1.from_json(x['project_merge_base']) if 'project_merge_base' in x else None,
                 fips_mode=_atd_read_bool(x['fips_mode']) if 'fips_mode' in x else False,
+                nosemgrep_disabled=_atd_read_bool(x['nosemgrep_disabled']) if 'nosemgrep_disabled' in x else False,
             )
         else:
             _atd_bad_json('ScanConfiguration', x)
@@ -9445,6 +9496,7 @@ class ScanConfiguration:
         if self.project_merge_base is not None:
             res['project_merge_base'] = (lambda x: x.to_json())(self.project_merge_base)
         res['fips_mode'] = _atd_write_bool(self.fips_mode)
+        res['nosemgrep_disabled'] = _atd_write_bool(self.nosemgrep_disabled)
         return res
 
     @classmethod
@@ -9667,6 +9719,12 @@ class ScanMetadata:
     Scanning. Since 1.96.0
     :param enable_mal_deps: Override to enable malicious dependency rules for
     this scan, even if disabled at the deployment level.
+    :param partial_scan_rule_ids: If set, the backend should filter the
+    generated scan config down to only these rule IDs. Used by Semgrep Managed
+    Scanning to run fast supply-chain incident scans for a small set of rules.
+    Absent means a normal full scan. Acts as a filter on the config that would
+    otherwise be produced: rules not normally included for this scan will
+    still not run.
     """
 
     cli_version: Version
@@ -9677,6 +9735,7 @@ class ScanMetadata:
     ecosystems: List[str] = field(default_factory=lambda: [])
     packages: List[str] = field(default_factory=lambda: [])
     enable_mal_deps: Optional[bool] = None
+    partial_scan_rule_ids: Optional[List[RuleId]] = None
 
     @classmethod
     def from_json(cls, x: Any) -> 'ScanMetadata':
@@ -9690,6 +9749,7 @@ class ScanMetadata:
                 ecosystems=_atd_read_list(_atd_read_string)(x['ecosystems']) if 'ecosystems' in x else [],
                 packages=_atd_read_list(_atd_read_string)(x['packages']) if 'packages' in x else [],
                 enable_mal_deps=_atd_read_bool(x['enable_mal_deps']) if 'enable_mal_deps' in x else None,
+                partial_scan_rule_ids=_atd_read_list(RuleId.from_json)(x['partial_scan_rule_ids']) if 'partial_scan_rule_ids' in x else None,
             )
         else:
             _atd_bad_json('ScanMetadata', x)
@@ -9706,6 +9766,8 @@ class ScanMetadata:
         res['packages'] = _atd_write_list(_atd_write_string)(self.packages)
         if self.enable_mal_deps is not None:
             res['enable_mal_deps'] = _atd_write_bool(self.enable_mal_deps)
+        if self.partial_scan_rule_ids is not None:
+            res['partial_scan_rule_ids'] = _atd_write_list((lambda x: x.to_json()))(self.partial_scan_rule_ids)
         return res
 
     @classmethod

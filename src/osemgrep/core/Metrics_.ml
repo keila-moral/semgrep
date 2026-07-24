@@ -176,6 +176,7 @@ let default_payload =
         isAuthenticated = false;
         integrationName = None;
         deployment_id = None;
+        installMethod = None;
       };
     performance =
       {
@@ -242,6 +243,30 @@ let default_payload =
         oauth_name = None;
         oauth_email = None;
       };
+    guardian =
+      {
+        hook = None;
+        session_id = None;
+        login_method = None;
+        scanner_version = None;
+        guardian_version = None;
+        deployment_names = None;
+        deployment_ids = None;
+        organization_ids = None;
+        oauth_id = None;
+        oauth_email = None;
+        tool_name = None;
+        package_manager = None;
+        attached_lockfile = None;
+        num_scanned_files = None;
+        num_lines = None;
+        num_findings = None;
+        findings = None;
+        blocking = None;
+        exit_code = None;
+        errors = None;
+      };
+    install_pro = { success = None; error = None };
   }
 
 let default () =

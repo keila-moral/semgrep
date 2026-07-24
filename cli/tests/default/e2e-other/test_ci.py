@@ -1753,6 +1753,66 @@ def test_nosem(
     )
 
 
+@pytest.mark.osemfail
+@pytest.mark.parametrize(
+    ("nosem_flag", "config_nosemgrep_disabled", "expected_disable_nosem"),
+    [
+        # No flag passed: the app's nosemgrep_disabled config drives behavior.
+        (None, True, True),
+        (None, False, False),
+        # An explicit flag always wins; the config value is ignored.
+        ("--enable-nosem", True, False),
+        ("--disable-nosem", False, True),
+    ],
+)
+def test_nosem_config_precedence(
+    git_tmp_path_with_commit,
+    mocker,
+    nosem_flag,
+    config_nosemgrep_disabled,
+    expected_disable_nosem,
+    run_semgrep: RunSemgrep,
+    start_scan_mock_maker,
+    complete_scan_mock_maker,
+    upload_results_mock_maker,
+):
+    """`semgrep ci` honors nosemgrep_disabled from the scan config only when
+    neither --enable-nosem nor --disable-nosem was passed; an explicit flag
+    always wins over the config value."""
+    start_scan_mock_maker("https://semgrep.dev")
+    complete_scan_mock_maker("https://semgrep.dev")
+    upload_results_mock_maker("https://semgrep.dev")
+
+    # Simulate the org-wide setting the app sends in the scan config.
+    mocker.patch.object(ScanHandler, "nosemgrep_disabled", config_nosemgrep_disabled)
+
+    # Capture the resolved run_scan args, then short-circuit so we don't need a
+    # real scan to assert how nosemgrep handling was resolved.
+    captured: Dict = {}
+
+    def fake_run_scan(**kwargs):
+        captured.update(kwargs)
+        raise SemgrepError("stop after capturing args", code=2)
+
+    mocker.patch.object(semgrep.run_scan, "run_scan", side_effect=fake_run_scan)
+
+    options = ["--no-suppress-errors", "--oss-only"]
+    if nosem_flag:
+        options.append(nosem_flag)
+
+    run_semgrep(
+        subcommand="ci",
+        options=options,
+        target_name=None,
+        strict=False,
+        assert_exit_code=2,
+        env={"SEMGREP_APP_TOKEN": "fake_key"},
+        use_click_runner=True,
+    )
+
+    assert captured["disable_nosem"] is expected_disable_nosem
+
+
 # Regression for ENGINE-1824: `semgrep ci --sarif-output` must preserve
 # nosemgrep-suppressed findings in the SARIF file with `suppressions`
 # entries, not drop them entirely. The bucketing in commands/ci.py must
@@ -1799,6 +1859,57 @@ def test_ci_sarif_output_preserves_nosemgrep_suppressions(
     assert len(suppressed) > 0, results
     for r in suppressed:
         assert r["suppressions"] == [{"kind": "inSource"}], r
+
+
+# Regression: --sarif-output must not zero out `CiScanResults.ignores`
+# on upload. Previously the JSON path populated it but the SARIF path
+# did not.
+@pytest.mark.kinda_slow
+@pytest.mark.parametrize(
+    "extra_options,expect_in_sarif_file",
+    [
+        ([], False),
+        (["--sarif-output", "out.sarif"], True),
+    ],
+    ids=["no-sarif", "sarif-output"],
+)
+@pytest.mark.osemfail  # osemgrep does not write --sarif-output files
+def test_ci_upload_ignores_field_populated_under_sarif(
+    git_tmp_path_with_commit,
+    mock_autofix,
+    run_semgrep: RunSemgrep,
+    start_scan_mock_maker,
+    complete_scan_mock_maker,
+    upload_results_mock_maker,
+    extra_options,
+    expect_in_sarif_file,
+):
+    start_scan_mock_maker("https://semgrep.dev")
+    complete_scan_mock_maker("https://semgrep.dev")
+    upload_results_mock = upload_results_mock_maker("https://semgrep.dev")
+
+    run_semgrep(
+        subcommand="ci",
+        options=[
+            "--no-suppress-errors",
+            "--oss-only",
+            "--enable-nosem",
+            *extra_options,
+        ],
+        target_name=None,
+        strict=False,
+        assert_exit_code=1,
+        env={"SEMGREP_APP_TOKEN": "fake_key"},
+        use_click_runner=True,
+    )
+
+    uploaded = upload_results_mock.last_request.json()
+    assert len(uploaded["ignores"]) > 0, uploaded
+
+    if expect_in_sarif_file:
+        sarif = json.loads(Path("out.sarif").read_text())
+        suppressed = [r for r in sarif["runs"][0]["results"] if r.get("suppressions")]
+        assert len(suppressed) > 0, sarif["runs"][0]["results"]
 
 
 @pytest.mark.parametrize(
@@ -3078,6 +3189,7 @@ def test_finding_suppressed_when_baseline_scan_fails(
         write_to_tr_cache: bool = True,
         fips_mode: bool,
         enable_transitive_reachability: Optional[bool] = None,
+        x_dependency_paths: bool = False,
         x_parmap: bool = False,
         run_symbol_analysis: bool = False,
         rpc_session: Optional[RpcSession] = None,
@@ -3110,6 +3222,7 @@ def test_finding_suppressed_when_baseline_scan_fails(
             write_to_tr_cache=write_to_tr_cache,
             fips_mode=fips_mode,
             enable_transitive_reachability=enable_transitive_reachability,
+            x_dependency_paths=x_dependency_paths,
             x_parmap=x_parmap,
             run_symbol_analysis=run_symbol_analysis,
             rpc_session=rpc_session,
@@ -3270,6 +3383,7 @@ def test_baseline_scan_failures_suppress_per_rule_and_whole_file(
         write_to_tr_cache: bool = True,
         fips_mode: bool,
         enable_transitive_reachability: Optional[bool] = None,
+        x_dependency_paths: bool = False,
         x_parmap: bool = False,
         run_symbol_analysis: bool = False,
         rpc_session: Optional[RpcSession] = None,
@@ -3302,6 +3416,7 @@ def test_baseline_scan_failures_suppress_per_rule_and_whole_file(
             write_to_tr_cache=write_to_tr_cache,
             fips_mode=fips_mode,
             enable_transitive_reachability=enable_transitive_reachability,
+            x_dependency_paths=x_dependency_paths,
             x_parmap=x_parmap,
             run_symbol_analysis=run_symbol_analysis,
             rpc_session=rpc_session,

@@ -226,15 +226,13 @@ let eval_regexp_matches ?(base_offset = 0) ~file ~regexp:re str =
    * alt: let s = value_to_string v in
    * to convert anything in a string before using regexps on it
    *)
-  let regexp = Pcre_.regexp ~flags:[ `ANCHORED ] re in
-  Xpattern_match_regexp.regexp_matcher ~base_offset
-    Xpattern_match_regexp.pcre_regex_functions str file regexp
-[@@alert "-deprecated"]
+  let regexp = Pcre2_.regexp ~flags:[ `ANCHORED ] re in
+  Xpattern_match_regexp.regexp_matcher ~base_offset str file regexp
 
 let rec eval env code =
   match code.G.e with
   | G.L x -> value_of_lit ~code x
-  | G.N (G.Id ((_, _), { id_svalue = { contents = Some (G.Lit lit) }; _ }))
+  | G.N (G.Id ((_, _), { id_svalue = { contents = G.Lit lit }; _ }))
   (* coupling: Constant_propagation.eval *)
   | G.Call
       ( { e = G.N (G.Id (("!dockerfile_expand!", _), _)); _ },
@@ -244,9 +242,7 @@ let rec eval env code =
               {
                 e =
                   G.N
-                    (G.Id
-                       ( (_, _),
-                         { id_svalue = { contents = Some (G.Lit lit) }; _ } ));
+                    (G.Id ((_, _), { id_svalue = { contents = G.Lit lit }; _ }));
                 _;
               };
           ],
@@ -260,7 +256,7 @@ let rec eval env code =
   | G.DotAccess
       ( { e = G.N (Id ((("local" | "var"), _), _)); _ },
         _,
-        FN (Id (_, { id_svalue = { contents = Some (Lit lit); _ }; _ })) )
+        FN (Id (_, { id_svalue = { contents = Lit lit; _ }; _ })) )
     when env.constant_propagation ->
       value_of_lit ~code lit
   | G.Call ({ e = Special (ConcatString op, _); _ }, (_, args, _)) ->
@@ -439,6 +435,10 @@ and eval_op op values code =
   | G.BitAnd, [ Int i1; Int i2 ] -> Int (Int64.logand i1 i2)
   | G.BitOr, [ Int i1; Int i2 ] -> Int (Int64.logor i1 i2)
   | G.BitXor, [ Int i1; Int i2 ] -> Int (Int64.logxor i1 i2)
+  | G.LSL, [ Int i1; Int i2 ] -> Int (Int64.shift_left i1 (Int64.to_int i2))
+  | G.ASR, [ Int i1; Int i2 ] -> Int (Int64.shift_right i1 (Int64.to_int i2))
+  | G.LSR, [ Int i1; Int i2 ] ->
+      Int (Int64.shift_right_logical i1 (Int64.to_int i2))
   | G.Eq, [ Int v1; Float v2 ] -> Bool (Int64.to_float v1 =*= v2)
   | G.Eq, [ Float v1; Int v2 ] -> Bool (v1 =*= Int64.to_float v2)
   (* TODO? dangerous use of polymorphic =*= ? *)

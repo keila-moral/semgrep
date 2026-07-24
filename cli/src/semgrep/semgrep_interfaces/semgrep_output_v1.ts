@@ -232,6 +232,7 @@ export type DependencyMatch = {
   dependency_pattern: ScaPattern;
   found_dependency: FoundDependency;
   lockfile: Fpath;
+  dependency_paths?: DependencyPath[];
 }
 
 export type ScaPattern = {
@@ -257,6 +258,10 @@ export type FoundDependency = {
 export type DependencyChild = {
   package_: string;
   version: string;
+}
+
+export type DependencyPath = {
+  nodes: DependencyChild[];
 }
 
 export type ValidationState =
@@ -637,6 +642,7 @@ export type ScanConfiguration = {
   triage_ignored_match_based_ids: string[];
   project_merge_base?: Sha1;
   fips_mode: boolean;
+  nosemgrep_disabled: boolean;
 }
 
 export type EngineConfiguration = {
@@ -713,6 +719,7 @@ export type ScanMetadata = {
   ecosystems: string[];
   packages: string[];
   enable_mal_deps?: boolean;
+  partial_scan_rule_ids?: RuleId[];
 }
 
 export type CiConfigFromRepo = {
@@ -1073,6 +1080,7 @@ export type TargetingConf = {
   force_project_root?: ProjectRoot;
   force_novcs_project: boolean;
   exclude_minified_files: boolean;
+  exclude_binary_files: boolean;
   baseline_commit?: string;
 }
 
@@ -2198,6 +2206,7 @@ export function writeDependencyMatch(x: DependencyMatch, context: any = x): any 
     'dependency_pattern': _atd_write_required_field('DependencyMatch', 'dependency_pattern', writeScaPattern, x.dependency_pattern, x),
     'found_dependency': _atd_write_required_field('DependencyMatch', 'found_dependency', writeFoundDependency, x.found_dependency, x),
     'lockfile': _atd_write_required_field('DependencyMatch', 'lockfile', writeFpath, x.lockfile, x),
+    'dependency_paths': _atd_write_optional_field(_atd_write_array(writeDependencyPath), x.dependency_paths, x),
   };
 }
 
@@ -2206,6 +2215,7 @@ export function readDependencyMatch(x: any, context: any = x): DependencyMatch {
     dependency_pattern: _atd_read_required_field('DependencyMatch', 'dependency_pattern', readScaPattern, x['dependency_pattern'], x),
     found_dependency: _atd_read_required_field('DependencyMatch', 'found_dependency', readFoundDependency, x['found_dependency'], x),
     lockfile: _atd_read_required_field('DependencyMatch', 'lockfile', readFpath, x['lockfile'], x),
+    dependency_paths: _atd_read_optional_field(_atd_read_array(readDependencyPath), x['dependency_paths'], x),
   };
 }
 
@@ -2268,6 +2278,18 @@ export function readDependencyChild(x: any, context: any = x): DependencyChild {
   return {
     package_: _atd_read_required_field('DependencyChild', 'package', _atd_read_string, x['package'], x),
     version: _atd_read_required_field('DependencyChild', 'version', _atd_read_string, x['version'], x),
+  };
+}
+
+export function writeDependencyPath(x: DependencyPath, context: any = x): any {
+  return {
+    'nodes': _atd_write_required_field('DependencyPath', 'nodes', _atd_write_array(writeDependencyChild), x.nodes, x),
+  };
+}
+
+export function readDependencyPath(x: any, context: any = x): DependencyPath {
+  return {
+    nodes: _atd_read_required_field('DependencyPath', 'nodes', _atd_read_array(readDependencyChild), x['nodes'], x),
   };
 }
 
@@ -3428,6 +3450,7 @@ export function writeScanConfiguration(x: ScanConfiguration, context: any = x): 
     'triage_ignored_match_based_ids': _atd_write_field_with_default(_atd_write_array(_atd_write_string), [], x.triage_ignored_match_based_ids, x),
     'project_merge_base': _atd_write_optional_field(writeSha1, x.project_merge_base, x),
     'fips_mode': _atd_write_field_with_default(_atd_write_bool, false, x.fips_mode, x),
+    'nosemgrep_disabled': _atd_write_field_with_default(_atd_write_bool, false, x.nosemgrep_disabled, x),
   };
 }
 
@@ -3438,6 +3461,7 @@ export function readScanConfiguration(x: any, context: any = x): ScanConfigurati
     triage_ignored_match_based_ids: _atd_read_field_with_default(_atd_read_array(_atd_read_string), [], x['triage_ignored_match_based_ids'], x),
     project_merge_base: _atd_read_optional_field(readSha1, x['project_merge_base'], x),
     fips_mode: _atd_read_field_with_default(_atd_read_bool, false, x['fips_mode'], x),
+    nosemgrep_disabled: _atd_read_field_with_default(_atd_read_bool, false, x['nosemgrep_disabled'], x),
   };
 }
 
@@ -3605,6 +3629,7 @@ export function writeScanMetadata(x: ScanMetadata, context: any = x): any {
     'ecosystems': _atd_write_field_with_default(_atd_write_array(_atd_write_string), [], x.ecosystems, x),
     'packages': _atd_write_field_with_default(_atd_write_array(_atd_write_string), [], x.packages, x),
     'enable_mal_deps': _atd_write_optional_field(_atd_write_bool, x.enable_mal_deps, x),
+    'partial_scan_rule_ids': _atd_write_optional_field(_atd_write_array(writeRuleId), x.partial_scan_rule_ids, x),
   };
 }
 
@@ -3618,6 +3643,7 @@ export function readScanMetadata(x: any, context: any = x): ScanMetadata {
     ecosystems: _atd_read_field_with_default(_atd_read_array(_atd_read_string), [], x['ecosystems'], x),
     packages: _atd_read_field_with_default(_atd_read_array(_atd_read_string), [], x['packages'], x),
     enable_mal_deps: _atd_read_optional_field(_atd_read_bool, x['enable_mal_deps'], x),
+    partial_scan_rule_ids: _atd_read_optional_field(_atd_read_array(readRuleId), x['partial_scan_rule_ids'], x),
   };
 }
 
@@ -4579,6 +4605,7 @@ export function writeTargetingConf(x: TargetingConf, context: any = x): any {
     'force_project_root': _atd_write_optional_field(writeProjectRoot, x.force_project_root, x),
     'force_novcs_project': _atd_write_required_field('TargetingConf', 'force_novcs_project', _atd_write_bool, x.force_novcs_project, x),
     'exclude_minified_files': _atd_write_required_field('TargetingConf', 'exclude_minified_files', _atd_write_bool, x.exclude_minified_files, x),
+    'exclude_binary_files': _atd_write_required_field('TargetingConf', 'exclude_binary_files', _atd_write_bool, x.exclude_binary_files, x),
     'baseline_commit': _atd_write_optional_field(_atd_write_string, x.baseline_commit, x),
   };
 }
@@ -4597,6 +4624,7 @@ export function readTargetingConf(x: any, context: any = x): TargetingConf {
     force_project_root: _atd_read_optional_field(readProjectRoot, x['force_project_root'], x),
     force_novcs_project: _atd_read_required_field('TargetingConf', 'force_novcs_project', _atd_read_bool, x['force_novcs_project'], x),
     exclude_minified_files: _atd_read_required_field('TargetingConf', 'exclude_minified_files', _atd_read_bool, x['exclude_minified_files'], x),
+    exclude_binary_files: _atd_read_required_field('TargetingConf', 'exclude_binary_files', _atd_read_bool, x['exclude_binary_files'], x),
     baseline_commit: _atd_read_optional_field(_atd_read_string, x['baseline_commit'], x),
   };
 }

@@ -333,8 +333,7 @@ let m_with_symbolic_propagation ~is_root f b tin =
      * one of these bugs. *)
     if tin.deref_sym_vals < max_NESTED_SYMBOLIC_PROPAGATION then
       match b.G.e with
-      | G.N (G.Id ((id, _), { id_svalue = { contents = Some (G.Sym b1) }; _ }))
-        ->
+      | G.N (G.Id ((id, _), { id_svalue = { contents = G.Sym b1 }; _ })) ->
           (* We shouldn't end up with a symbol that resolves to itself, but if
            * we do, we shouldn't crash. This simple check will not protect
            * against complicated paths through which a symbol could resolve to
@@ -1028,6 +1027,12 @@ and m_expr ?(is_root = false) ?(arguments_have_changed = true) a b =
       B.Call ({ e = B.Special (B.Op B.Minus, _); _ }, (_, [ B.Arg argb ], _)) )
     ->
       m_expr (G.L (G.Int (Parsed_int.neg int_lit)) |> G.e) argb
+  (* equivalence: Call (-, [Int (n)]) => Int (-n) within patterns, match with constprop *)
+  | ( G.Call
+        ( { e = G.Special (G.Op G.Minus, _); _ },
+          (_, [ G.Arg { e = G.L (G.Int int_lit); _ } ], _) ),
+      _b ) ->
+      m_expr (G.L (G.Int (Parsed_int.neg int_lit)) |> G.e) b
   (* must be before constant propagation case below *)
   | G.L a1, B.L b1 -> m_literal a1 b1
   (* equivalence: constant propagation and evaluation!
@@ -1482,10 +1487,7 @@ and m_literal_svalue a b =
       match a with
       | G.String (_, ("...", _), _) -> return ()
       | ___else___ -> fail ())
-  | B.Cst _
-  | B.Sym _
-  | B.NotCst ->
-      fail ()
+  | _ -> fail ()
 
 and m_arithmetic_operator a b =
   Trace_matching.(if on then print_arithmetic_operator_pair a b);
@@ -2411,6 +2413,13 @@ and m_generic_type_vs_type_t lang tok a b =
       m_generic_type_vs_type_t lang tok t1 t2
   | G.TyExpr { e = G.N name1; _ }, _ ->
       m_generic_type_vs_type_t lang tok (G.TyN name1 |> G.t) b
+  (* In some languages (e.g. Python), a qualified name in type position
+   * (`x: a.b.C`) parses as a DotAccess expr rather than a TyN. Convert it to
+   * a name so it can match the resolved name of the inferred type. *)
+  | G.TyExpr ({ e = G.DotAccess _; _ } as e1), _ -> (
+      match H.name_of_dot_access e1 with
+      | Some name1 -> m_generic_type_vs_type_t lang tok (G.TyN name1 |> G.t) b
+      | None -> fail ())
   | _, Type.N _
   | _, Type.UnresolvedName _
   | _, Type.Builtin _

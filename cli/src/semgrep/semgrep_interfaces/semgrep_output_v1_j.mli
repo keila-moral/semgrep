@@ -122,6 +122,11 @@ type dependency_kind = Semgrep_output_v1_t.dependency_kind =
 
   [@@deriving ord, eq, show]
 
+type dependency_path = Semgrep_output_v1_t.dependency_path = {
+  nodes: dependency_child list
+}
+  [@@deriving ord]
+
 (**
   both ecosystem and transitivity below have frozen=True so the generated
   classes can be hashed and put in sets (see calls to reachable_deps.add() in
@@ -487,7 +492,18 @@ type sca_pattern = Semgrep_output_v1_t.sca_pattern = {
 type dependency_match = Semgrep_output_v1_t.dependency_match = {
   dependency_pattern: sca_pattern;
   found_dependency: found_dependency;
-  lockfile: fpath
+  lockfile: fpath;
+  dependency_paths: dependency_path list option
+    (**
+      All known dependency paths by which the matched (transitive) dependency
+      was introduced into the project. Each path is ordered from the direct
+      dependency that introduced it (node 0) to the matched (transitive)
+      dependency (last node). Computed locally from the resolved dependency
+      graph at scan time; only populated when dependency-graph
+      (path-to-transitivity) resolution ran for the ecosystem. Empty/absent
+      for direct dependencies or ecosystems without graph resolution. The
+      number of paths per match is capped. EXPERIMENTAL since 1.166.0
+    *)
 }
   [@@deriving ord]
 
@@ -1270,6 +1286,7 @@ type targeting_conf = Semgrep_output_v1_t.targeting_conf = {
     *);
   force_novcs_project: bool;
   exclude_minified_files: bool;
+  exclude_binary_files: bool;
   baseline_commit: string option
 }
   [@@deriving show]
@@ -1637,6 +1654,11 @@ type scan_configuration = Semgrep_output_v1_t.scan_configuration = {
       From 1.126.0. Customers in FIPS environments have specific hash
       function requirements that this flag will override. See SAF-2057 for
       details.
+    *);
+  nosemgrep_disabled: bool
+    (**
+      From 1.166.0. Org-wide setting (deployment.nosemgrep_disabled) that
+      disables 'nosemgrep' inline ignore comments for the scan.
     *)
 }
 
@@ -1714,6 +1736,15 @@ type scan_metadata = Semgrep_output_v1_t.scan_metadata = {
     (**
       Override to enable malicious dependency rules for this scan, even if
       disabled at the deployment level.
+    *);
+  partial_scan_rule_ids: rule_id list option
+    (**
+      If set, the backend should filter the generated scan config down to
+      only these rule IDs. Used by Semgrep Managed Scanning to run fast
+      supply-chain incident scans for a small set of rules. Absent means a
+      normal full scan. Acts as a filter on the config that would otherwise
+      be produced: rules not normally included for this scan will still not
+      run.
     *)
 }
 
@@ -2702,6 +2733,26 @@ val read_dependency_kind :
 val dependency_kind_of_string :
   string -> dependency_kind
   (** Deserialize JSON data of type {!type:dependency_kind}. *)
+
+val write_dependency_path :
+  Buffer.t -> dependency_path -> unit
+  (** Output a JSON value of type {!type:dependency_path}. *)
+
+val string_of_dependency_path :
+  ?len:int -> dependency_path -> string
+  (** Serialize a value of type {!type:dependency_path}
+      into a JSON string.
+      @param len specifies the initial length
+                 of the buffer used internally.
+                 Default: 1024. *)
+
+val read_dependency_path :
+  Yojson.Safe.lexer_state -> Lexing.lexbuf -> dependency_path
+  (** Input JSON data of type {!type:dependency_path}. *)
+
+val dependency_path_of_string :
+  string -> dependency_path
+  (** Deserialize JSON data of type {!type:dependency_path}. *)
 
 val write_ecosystem :
   Buffer.t -> ecosystem -> unit

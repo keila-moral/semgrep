@@ -274,7 +274,7 @@ let sanity_check_contributions (contribs : Out.contribution list) : unit =
   | [] -> Logs.warn (fun m -> m "no contribution found from git log, weird")
   | x :: _xs ->
       Logs.debug (fun m ->
-          m "found %d contribs in the last 30 days, last is %s"
+          m "found %d contribs in the last 90 days, last is %s"
             (List.length contribs)
             (Out.string_of_contribution x))
 
@@ -358,6 +358,7 @@ let scan_metadata () : Out.scan_metadata =
         packages = [];
         sms_scan_id = !Semgrep_envvars.v.sms_scan_id;
         enable_mal_deps = None;
+        partial_scan_rule_ids = None;
       }
   in
   res.sms_scan_id
@@ -963,6 +964,8 @@ let run_conf (ci_conf : Ci_CLI.conf) : Exit_code.t =
         triage_ignored_match_based_ids = _;
         project_merge_base = _;
         fips_mode;
+        (* TODO: use ? *)
+        nosemgrep_disabled = _;
       };
     (* TODO: lots of things to use there *)
     engine_params =

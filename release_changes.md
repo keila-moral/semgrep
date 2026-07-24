@@ -1,36 +1,41 @@
-## [1.164.0](https://github.com/semgrep/semgrep/releases/tag/v1.164.0) - 2026-05-26
+## [1.170.0](https://github.com/semgrep/semgrep/releases/tag/v1.170.0) - 2026-07-15
 
 ### ### Added
 
-- Dart: typed metavariables (`$X as T`) and `metavariable-type`,
-  metavariable binding inside string interpolations, and function-definition
-  patterns that match Dart function definitions. (gh-11678)
+- Pro C/C++ scans now skip code inside statically-dead preprocessor branches
+  (for example, `#if 0 ... #else ... #endif`). Patterns that would otherwise
+  match against intentionally-disabled code no longer report on it. (cpp-if-zero-filter)
+- Restored obackward: semgrep-core and semgrep-core-proprietary once again print a backtrace when receiving a fatal signal (e.g. SIGSEGV) (obackward)
+- `semgrep install-semgrep-pro` now sends usage metrics so that
+  installation errors can be tracked. Metrics can be disabled with
+  `--metrics off` or `SEMGREP_SEND_METRICS=off`. Metrics payloads also
+  now include the method used to install the Semgrep CLI (pip, homebrew,
+  docker, or unknown), detected heuristically. See metrics.md for
+  more details of what exactly is sent. (engine-2858)
 
 ### ### Changed
 
-- The default memory limit for Pro interfile scans on Linux now adapts to the container's cgroup memory limit (90% of it) instead of the previous fixed 5 GiB, with an 8 GiB fallback when no cgroup limit is detected. (ENGINE-2568)
-- Lower the glibc contraint from `>=2.35` to `>=2.34`, allowing users on distros
-  that ship glibc 2.34 (e.g RHEL 9 & AL2023) to install the semgrep wheel. (gh-11622)
+- Increased the timeout for dynamic dependency resolution subprocesses from
+  600 to 900 seconds, giving large projects more time to resolve dependencies
+  before timing out. (SC-3699)
+- Pro C/C++ `#if 0` filtering now also handles cases where the directive splits a
+  syntactic unit.  For example, a function signature toggle like `#if 0 void
+  foo(int i) { #else void foo(uint32_t i) { #endif`. (engine-994)
 
 ### ### Fixed
 
-- Baseline diff scans (``semgrep ci`` and ``--baseline-commit``) no longer treat every finding on a file as newly introduced when rule(s) failed during the baseline run.
+- Fixed a crash at startup (`Fatal error: Failed to allocate signal stack for
+  domain 0`) when running Semgrep on systems with musl 1.2.6 (e.g. Alpine 3.24) on
+  recent Intel CPUs whose kernel-reported minimum signal-stack size exceeds musl's
+  build-time SIGSTKSZ (notably AMX-capable Xeons). (ENGINE-2863)
+- Dockerfile: Fixed parse errors on `RUN` instructions that use heredoc syntax
+  (`<<EOF`, `<<-EOF`, quoted delimiters). (LANG-263)
+- `metavariable-type` now supports fully qualified type names in languages
+  where a qualified name in type position parses as an expression (e.g.
+  Python's `types: [a.b.C]`) when the metavariable's type is determined by
+  type inference, such as Pro engine cross-file type resolution. (LANG-583)
+- Updated the ocaml-tree-sitter-core dependency to the latest `main`.
 
-  Per-rule failures (for example a timeout for a single rule) on baseline analysis now hide only that rule's matches on that file from the "new vs baseline" comparison.
-  Other rules on the same file are still taken in comparison for the "new vs baseline" comparison.
-
-  Per-file, rule-independent failures now hide all findings on that file from the "new vs baseline" comparison. (LANG-515)
-- Fixed a yarn.lock parse error on Yarn Berry entries written
-  in YAML explicit-key form. Affected lockfiles previously failed to parse. (SC-3479)
-- The (beta) SBT resolver with `--allow-local-builds` now correctly identifies dependencies as part of the Maven ecosystem. (SC-3522)
-- Fix `--sarif-output` and `--sarif` causing nosemgrep-suppressed findings to be reported in CLI scan output and to block scans. Suppressed findings are now correctly excluded from terminal text output, the scan-summary count, and the CLI's exit code. (engine-1824)
-- Fixed a bug that could cause unreliable target filtering in parallel scans. (gh-6313)
-- Dart: improved parser fidelity for Dart 3 grammar features and routed
-  pattern parsing for statements beginning with `await`, `rethrow`, and other
-  statement keywords. Eliminates a large class of `PartialParsing` errors on
-  real-world pub.dev packages. (gh-11678)
-
-### ### Infra/Release Changes
-
-- pro: macOS: Fixed dynamic library lookup for `semgrep-core-proprietary` so the binary works when `semgrep install-semgrep-pro` is invoked, and `semgrep` is installed via Homebrew. (pro-binary-homebrew)
-- Pro: Added optional `<case>.named_ast.expect` golden files for `tests/intrafile/maturity/` fixtures, exercised by `Unit_maturity_named_asts`. (LANG-287)
+    * Fails loudly on a parser/runtime ABI mismatch
+    * Stamps every generated `parser.c` with the tree-sitter version that produced it.
+    * Changed paths where tree-sitter versions are installed (lang-591)

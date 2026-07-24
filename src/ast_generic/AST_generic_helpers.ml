@@ -312,7 +312,7 @@ let is_boolean_operator = function
   | Plus (* unary too *) | Minus (* unary too *)
   | Mult | Div | Mod
   | Pow | FloorDiv | MatMult (* Python *)
-  | LSL | LSR | ASR (* L = logic, A = Arithmetic, SL = shift left *)
+  | LSL | LSR | ASR
   | BitOr | BitXor | BitAnd | BitNot | BitClear (* unary *)
   | Range | Nullish | NotNullPostfix | Elvis | Length
   | RangeInclusive
@@ -472,7 +472,7 @@ let abstract_for_comparison_visitor =
     method! visit_id_info env ii =
       (* TODO: false positive? *)
       (* nosemgrep: no-ref-declarations-at-top-scope *)
-      super#visit_id_info env { ii with AST_generic.id_svalue = ref None }
+      super#visit_id_info env { ii with AST_generic.id_svalue = ref G.Unknown }
   end
 
 let abstract_for_comparison_any x =

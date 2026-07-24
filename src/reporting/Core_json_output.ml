@@ -228,13 +228,11 @@ let get_propagated_value default_start mvalue =
   match mvalue with
   | E { e = N (Id (_, id_info)); _ } -> (
       match !(id_info.id_svalue) with
-      | Some (Lit x) ->
+      | Lit x ->
           let any = E (L x |> e) in
           any_to_svalue_value any
-      | Some (Sym x) -> any_to_svalue_value (E x)
-      | Some (Cst _) -> None
-      | Some NotCst -> None
-      | None -> None)
+      | Sym x -> any_to_svalue_value (E x)
+      | _ -> None)
   | __else__ -> None
 
 let metavars startp_of_match_range (s, mval) =
@@ -394,7 +392,15 @@ let sca_to_sca (rule_metadata : Yojson.Basic.t option) (m : SCA_match.t) :
     let found_dependency : Out.found_dependency =
       Dependency.to_found_dependency ~lockfile_path:lockfile dep None
     in
-    Out.{ dependency_pattern; found_dependency; lockfile }
+    (* dependency paths are computed in pysemgrep (dependency_aware_rule.py),
+     * not in semgrep-core; left unset here. *)
+    Out.
+      {
+        dependency_pattern;
+        found_dependency;
+        lockfile;
+        dependency_paths = None;
+      }
   in
   let kind =
     match (kind, sca_rule_kind) with

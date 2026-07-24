@@ -69,6 +69,7 @@ from semgrep.core_runner import CoreRunner
 from semgrep.dependency_aware_rule import dependencies_range_match_any
 from semgrep.dependency_aware_rule import parse_depends_on_yaml
 from semgrep.dependency_aware_rule import SubprojectDependencyIndex
+from semgrep.dependency_path import DependencyParentIndex
 from semgrep.engine import EngineType
 from semgrep.error import InvalidScanningRootError
 from semgrep.error import MISSING_CONFIG_EXIT_CODE
@@ -90,6 +91,7 @@ from semgrep.resolve_subprojects import resolve_subprojects
 from semgrep.rpc import RpcSession
 from semgrep.rpc_call import dump_rule_partitions
 from semgrep.rule import Rule
+from semgrep.rule_lang import RuleValidationMode
 from semgrep.rule_match import RuleMatches
 from semgrep.rule_match import RuleMatchMap
 from semgrep.semgrep_interfaces.semgrep_metrics import Any_ as AnySecretsOrigin
@@ -210,20 +212,19 @@ def sanity_check_resolved_config(
         )
 
 
-def _raise_deferred_core_rule_validation_errors(
+def _raise_skipped_rule_validation_errors(
     errors: Sequence[SemgrepError],
-    defer_core_rule_validation: bool,
+    validation_mode: RuleValidationMode,
 ) -> None:
-    """Preserve config-loading error semantics after deferring core validation.
+    """Preserve config-loading error semantics when pre-validation was skipped.
 
-    `defer_core_rule_validation` is used for App-provided rules in `semgrep ci`.
-    Those rules used to fail during Python config loading if semgrep-core rejected
-    their schema. After deferring that validation, the same failure is reported
-    by the scan subprocess as a structured RuleParseError. Convert it back into
-    the config-style error before regular scan error handling so CI reports the
-    failure to the App and exits with the historical missing-config code.
+    When `validation_mode` is NONE we skip the Python-side schema check; rule
+    schema errors then surface from the scan subprocess as RuleParseError.
+    Convert those back into the config-style error before regular scan error
+    handling so the historical missing-config exit code and error wording are
+    preserved (matters in particular for the `semgrep ci` App-rules path).
     """
-    if not defer_core_rule_validation:
+    if validation_mode is not RuleValidationMode.NONE:
         return
 
     rule_errors = [
@@ -488,6 +489,7 @@ def baseline_run(
     output_extra: OutputExtra,
     include: Sequence[str],
     exclude: Mapping[out.Product, Sequence[str]],
+    exclude_binary_files: bool,
     max_target_bytes: int,
     respect_git_ignore: bool,
     skip_unknown_extensions: bool,
@@ -598,6 +600,7 @@ def baseline_run(
                     scanning_root_strings=baseline_scanning_root_strings,
                     includes=include,
                     excludes=exclude,
+                    exclude_binary_files=exclude_binary_files,
                     max_target_bytes=max_target_bytes,
                     # only target the paths that had a match, ignoring symlinks
                     # and non-existent files
@@ -835,6 +838,7 @@ def adjust_matches_for_sca_rules(
     write_to_tr_cache: bool = True,
     rpc_session: Optional[RpcSession] = None,
     enable_transitive_reachability: Optional[bool] = False,
+    x_dependency_paths: bool = False,
 ) -> None:
     """
     Generates SCA findings based on the dependency-aware rules and the resolved subprojects.
@@ -867,6 +871,20 @@ def adjust_matches_for_sca_rules(
             dependency_index[ecosystem].append((subproject, idx))
             num_dependencies += idx.num_deps
 
+    # The reverse dependency graph used for dependency paths is built once per
+    # scan (and reused across every reachability rule below) only when the
+    # feature is on -- this is the single place the flag gates the work. Keyed
+    # by subproject identity; a present entry tells the generators to emit paths.
+    parent_indexes: Dict[int, DependencyParentIndex] = (
+        {
+            id(subproject): DependencyParentIndex.from_dependencies(idx.deps)
+            for entries in dependency_index.values()
+            for subproject, idx in entries
+        }
+        if x_dependency_paths
+        else {}
+    )
+
     for rule in dependency_aware_rules:
         if rule.should_run_on_semgrep_core:
             # If we have a reachability rule (contains a pattern)
@@ -884,7 +902,8 @@ def adjust_matches_for_sca_rules(
             ) = generate_reachable_sca_findings(
                 rule_matches_by_rule.get(rule, []),
                 rule,
-                resolved_subprojects,
+                dependency_index,
+                parent_indexes=parent_indexes,
             )
 
             rule_matches_by_rule[rule] = dep_rule_matches
@@ -903,6 +922,7 @@ def adjust_matches_for_sca_rules(
                 enable_transitive_reachability=enable_transitive_reachability,
                 write_to_tr_cache=write_to_tr_cache,
                 rpc_session=rpc_session,
+                parent_indexes=parent_indexes,
             )
 
             rule_matches_by_rule[rule].extend(dep_rule_matches)
@@ -921,6 +941,7 @@ def adjust_matches_for_sca_rules(
                 enable_transitive_reachability=False,
                 write_to_tr_cache=write_to_tr_cache,
                 rpc_session=rpc_session,
+                parent_indexes=parent_indexes,
             )
 
             rule_matches_by_rule[rule] = dep_rule_matches
@@ -1032,6 +1053,7 @@ def run_rules(
     write_to_tr_cache: bool = True,
     fips_mode: bool,
     enable_transitive_reachability: Optional[bool] = None,
+    x_dependency_paths: bool = False,
     x_parmap: bool = False,
     run_symbol_analysis: bool = False,
     rpc_session: Optional[RpcSession] = None,
@@ -1156,6 +1178,7 @@ def run_rules(
             output_extra=output_extra,
             write_to_tr_cache=write_to_tr_cache,
             enable_transitive_reachability=enable_transitive_reachability,
+            x_dependency_paths=x_dependency_paths,
             fips_mode=fips_mode,
             rpc_session=rpc_session,
         )
@@ -1249,12 +1272,13 @@ def run_scan(
     # not set a default at this level.
     config_strs: Optional[Sequence[str]],
     rules_string: Optional[str] = None,
-    defer_core_rule_validation: bool = False,
+    validation_mode: RuleValidationMode = RuleValidationMode.FULL,
     no_rewrite_rule_ids: bool = False,
     jobs: Optional[int] = None,
     include: Optional[Sequence[str]] = None,
     exclude: Optional[Mapping[Product, Sequence[str]]] = None,
     exclude_rule: Optional[Sequence[str]] = None,
+    exclude_binary_files: bool = True,
     strict: bool = False,
     autofix: AutofixBehavior = AutofixBehavior.IGNORE,
     replacement: Optional[str] = None,
@@ -1286,10 +1310,10 @@ def run_scan(
     x_ls: bool = False,
     x_ls_long: bool = False,
     enable_transitive_reachability: Optional[bool] = None,
+    x_dependency_paths: bool = False,
     x_parmap: bool = False,
     x_pro_naming: bool = False,
     x_run_taint_once: bool = True,
-    x_no_python_schema_validation: bool = False,
     path_sensitive: bool = False,
     capture_core_stderr: bool = True,
     allow_local_builds: bool = False,
@@ -1355,8 +1379,7 @@ def run_scan(
             elif rules_string is not None:
                 configs_obj, config_errors = Config.from_rules_string(
                     rules_string,
-                    no_python_schema_validation=x_no_python_schema_validation,
-                    defer_core_rule_validation=defer_core_rule_validation,
+                    validation_mode=validation_mode,
                 )
             elif config_strs is not None:
                 if replacement:
@@ -1366,7 +1389,7 @@ def run_scan(
                 configs_obj, config_errors = Config.from_config_list(
                     config_strs or [],
                     project_url,
-                    no_python_schema_validation=x_no_python_schema_validation,
+                    validation_mode=validation_mode,
                 )
 
         progress.remove_task(task_id)
@@ -1453,6 +1476,7 @@ def run_scan(
             scanning_root_strings=scanning_root_strings,
             includes=include,
             excludes=exclude,
+            exclude_binary_files=exclude_binary_files,
             force_novcs_project=force_novcs_project,
             force_project_root=force_project_root,
             max_target_bytes=max_target_bytes,
@@ -1573,15 +1597,16 @@ def run_scan(
             fips_mode=fips_mode,
             write_to_tr_cache=write_to_tr_cache,
             enable_transitive_reachability=enable_transitive_reachability,
+            x_dependency_paths=x_dependency_paths,
             x_parmap=x_parmap,
             run_symbol_analysis=run_symbol_analysis,
             rpc_session=rpc_session,
         )
         profiler.save("core_time", core_start_time)
         semgrep_errors: List[SemgrepError] = config_errors + scan_errors
-        _raise_deferred_core_rule_validation_errors(
+        _raise_skipped_rule_validation_errors(
             scan_errors,
-            defer_core_rule_validation,
+            validation_mode,
         )
         output_handler.handle_semgrep_errors(semgrep_errors)
 
@@ -1601,6 +1626,7 @@ def run_scan(
                 output_extra=output_extra,
                 include=include,
                 exclude=exclude,
+                exclude_binary_files=exclude_binary_files,
                 max_target_bytes=max_target_bytes,
                 respect_git_ignore=respect_git_ignore,
                 skip_unknown_extensions=skip_unknown_extensions,

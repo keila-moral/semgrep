@@ -47,7 +47,7 @@ jobs:
     needs: get-inputs
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
       - run: semgrep ci
   semgrep-ci-fail-open:
     container:
@@ -59,7 +59,7 @@ jobs:
     needs: get-inputs
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
       - name: Remove Git Exe
         run: |
           which git
@@ -74,7 +74,7 @@ jobs:
     needs: get-inputs
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
       - id: create-code
         name: Create code under test
         run: |
@@ -98,13 +98,13 @@ jobs:
     steps:
       - id: token
         name: Get token for semgrep-ci GitHub App
-        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
         with:
           client-id: ${{ secrets.SEMGREP_CI_CLIENT_ID }}
           owner: semgrep
           private-key: ${{ secrets.SEMGREP_CI_APP_KEY }}
           repositories: e2e
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           ref: ${{ github.event.repository.default_branch }}
           repository: semgrep/e2e
@@ -129,7 +129,7 @@ jobs:
     steps:
       - id: token
         name: Get token for semgrep-ci GitHub App
-        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
         with:
           client-id: ${{ secrets.SEMGREP_CI_CLIENT_ID }}
           owner: semgrep

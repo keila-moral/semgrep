@@ -6,6 +6,139 @@
 
 <!-- insertion point -->
 
+## [1.170.0](https://github.com/semgrep/semgrep/releases/tag/v1.170.0) - 2026-07-15
+
+### ### Added
+
+- Pro C/C++ scans now skip code inside statically-dead preprocessor branches
+  (for example, `#if 0 ... #else ... #endif`). Patterns that would otherwise
+  match against intentionally-disabled code no longer report on it. (cpp-if-zero-filter)
+- Restored obackward: semgrep-core and semgrep-core-proprietary once again print a backtrace when receiving a fatal signal (e.g. SIGSEGV) (obackward)
+- `semgrep install-semgrep-pro` now sends usage metrics so that
+  installation errors can be tracked. Metrics can be disabled with
+  `--metrics off` or `SEMGREP_SEND_METRICS=off`. Metrics payloads also
+  now include the method used to install the Semgrep CLI (pip, homebrew,
+  docker, or unknown), detected heuristically. See metrics.md for
+  more details of what exactly is sent. (engine-2858)
+
+### ### Changed
+
+- Increased the timeout for dynamic dependency resolution subprocesses from
+  600 to 900 seconds, giving large projects more time to resolve dependencies
+  before timing out. (SC-3699)
+- Pro C/C++ `#if 0` filtering now also handles cases where the directive splits a
+  syntactic unit.  For example, a function signature toggle like `#if 0 void
+  foo(int i) { #else void foo(uint32_t i) { #endif`. (engine-994)
+
+### ### Fixed
+
+- Fixed a crash at startup (`Fatal error: Failed to allocate signal stack for
+  domain 0`) when running Semgrep on systems with musl 1.2.6 (e.g. Alpine 3.24) on
+  recent Intel CPUs whose kernel-reported minimum signal-stack size exceeds musl's
+  build-time SIGSTKSZ (notably AMX-capable Xeons). (ENGINE-2863)
+- Dockerfile: Fixed parse errors on `RUN` instructions that use heredoc syntax
+  (`<<EOF`, `<<-EOF`, quoted delimiters). (LANG-263)
+- `metavariable-type` now supports fully qualified type names in languages
+  where a qualified name in type position parses as an expression (e.g.
+  Python's `types: [a.b.C]`) when the metavariable's type is determined by
+  type inference, such as Pro engine cross-file type resolution. (LANG-583)
+- Updated the ocaml-tree-sitter-core dependency to the latest `main`.
+
+    * Fails loudly on a parser/runtime ABI mismatch
+    * Stamps every generated `parser.c` with the tree-sitter version that produced it.
+    * Changed paths where tree-sitter versions are installed (lang-591)
+
+
+## [1.169.0](https://github.com/semgrep/semgrep/releases/tag/v1.169.0) - 2026-07-08
+
+### ### Infra/Release Changes
+
+- Updated Dart parser to a more recent upstream version. (LANG-579)
+
+
+## [1.168.0](https://github.com/semgrep/semgrep/releases/tag/v1.168.0) - 2026-06-24
+
+### ### Added
+
+- Added an experimental `--x-dependency-paths` flag to `scan` and `ci` that includes the full dependency path(s) for transitive supply-chain findings in `--json` and `--sarif` output. (SC-3547)
+
+### ### Changed
+
+- Malicious supply chain rules are now labeled "Malicious" instead of "Basic" in the scan analysis summary table. (SC-3504)
+
+### ### Infra/Release Changes
+
+- semgrep-core no longer depends on libpcre 8.x; libpcre2 10.x is now the sole regex engine. (drop-libpcre)
+- Aliengrep (generic mode) now uses the maintained libpcre2 10.x regular-expression library instead of the deprecated libpcre 8.x. Matching behavior is unchanged. (aliengrep-pcre2)
+- The `metavariable-regex` and `metavariable-comparison` (`re.match()`) runtimes now use the maintained libpcre2 10.x library instead of the deprecated libpcre 8.x. Matching behavior is unchanged. (eval-generic-pcre2)
+
+
+## [1.167.0](https://github.com/semgrep/semgrep/releases/tag/v1.167.0) - 2026-06-17
+
+### ### Added
+
+- Added support for more operators for folding for constant propagation, including subtraction, division, bit ops, bit shifts, comparisons, and more. (const-folding)
+- Added a `nosemgrep_disabled` field to the scan configuration so the platform can disable `nosemgrep` inline ignore comments org-wide for a scan. (APPEX-1122)
+- Semgrep now skips binary files (images, archives, compiled executables,
+  etc.) during scanning by default, detected via matching file extensions
+  to known file-format magic bytes Pass `--no-exclude-binary-files` to
+  scan binary files as before. (ENGINE-2708)
+
+### ### Fixed
+
+- `semgrep ci` with `--sarif` now correctly populates the output's `ignores`
+  field with nosemgrep-suppressed findings, in accordance with other output
+  formatters. (gh-6651)
+
+### ### Infra/Release Changes
+
+- Updated the `ocaml-tree-sitter-core` submodule to the latest upstream `main`, providing
+
+  * improved thread-safety
+  * bumps the tree-sitter CLI option used from 0.20.6 to 0.20.8.
+
+  (ocaml-tree-sitter-core-bump)
+
+
+## [1.166.0](https://github.com/semgrep/semgrep/releases/tag/v1.166.0) - 2026-06-11
+
+### ### Added
+
+- Pro: Added experimental cross-file (interfile) analysis for Gosu, enabling taint tracking across multiple Gosu source files. (gosu-interfile)
+- Added support for more operators for folding for constant propagation, including subtraction, division, bit ops, bit shifts, comparisons, and more (ENGINE-2789)
+
+### ### Fixed
+
+- Fixed parsing of integer literals with an underscore immediately after the radix prefix (e.g. `0x_dead_beef`, `0o_755`, `0b_1010_1010`). (LANG-533)
+- Python parsing now preserves type parameters on `def` and `class` definitions. (LANG-536)
+- Semgrep no longer stores the API token in  `~/.semgrep/settings.yml`'s stored
+  token when the current scan's token is supplied via the `SEMGREP_APP_TOKEN`
+  envvar. (SEC-2240)
+- `semgrep ci` scans originating from a pre-commit hook will no longer fail with
+  `Unable to create '<tmp>/.git/index.lock': Not a directory` in certain cases. (engine-2736)
+
+### ### Infra/Release Changes
+
+- Added parsing tests covering Python language features (Python 3.0–3.12). (LANG-531)
+
+
+## [1.165.0](https://github.com/semgrep/semgrep/releases/tag/v1.165.0) - 2026-06-03
+
+### ### Added
+
+- Added `--max-match-context-size` option to limit the number of characters of source code included as context for each match in the output. This prevents matches in minified files (e.g., minified JavaScript where the entire file is a single line) from producing enormous output Set to 0 for unlimited, which is the default value. (ENGINE-2117)
+
+### ### Changed
+
+- Replaced `--x-no-python-schema-validation` with a value-taking `--x-rule-validation=full|core-only|none` flag. The default (`full`) preserves existing Python rule validation behavior; `core-only` matches the old flag's semantics (disables Python rule validation and uses semgrep-core RPC validation only); `none` skips both pre-validation passes, surfacing rule errors at scan-time. `--x-no-python-schema-validation` is still accepted as a no-op with a deprecation warning, and will be removed in a future release. (x-rule-validation)
+- Python: Updated Python grammar (LANG-201)
+
+### ### Fixed
+
+- Added bit shift operations to metavar comparison in addition to already present standard arithmetic operators and logical bit ops. (ENGINE-2448)
+- Reduce intermittent `validation_error` results on HTTP secret validators (Facebook, Slack, Stripe, Google, Cloudflare, etc.) by retrying transient network failures, mirroring the retry behavior already present for AWS validators. (SCRT-965)
+
+
 ## [1.164.0](https://github.com/semgrep/semgrep/releases/tag/v1.164.0) - 2026-05-26
 
 ### ### Added
